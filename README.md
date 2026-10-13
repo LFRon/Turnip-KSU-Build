@@ -57,7 +57,10 @@ Everything needed from the network lives under `turnip_workdir/` in
   sidecar (falling back to an archive integrity test if the sidecar is
   unreachable) plus a `unzip -t` test; the tree is re-unpacked only when the
   archive hash changes (`.unpacked` stamp).  Bumping `NDKVER` simply
-  re-verifies and refreshes these slots in place.
+  re-verifies and refreshes these slots in place; the mesa build dir is
+  additionally recreated when the NDK toolchain version changes, because
+  object files built by the previous clang cannot be reused (a dir without
+  the recorded `.ndk-fingerprint` is recreated once).
 * `mesa-source/`: the cached checkout, pulled with `git clone --depth=1`
   (shallow; set `MESA_CLONE_DEPTH=0` for a full clone); used as-is, only
   touched by `--update-mesa` or `--mesa-rev`.

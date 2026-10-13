@@ -105,6 +105,18 @@ else
 fi
 [ -x "$ndkbin/clang" ] || die "NDK toolchain missing under: $ndkbin"
 
+# A build dir built with a different NDK cannot be reused: object files keep
+# the old clang, and ninja never notices because the command lines are
+# identical.  Fingerprint the toolchain and recreate the build dir on any
+# change; dirs without a fingerprint are recreated once (one-time migration).
+ndk_fp="$("$ndkbin/clang" --version 2>/dev/null | head -n 1)"
+if [ -f "$mesabuild_dir/build.ninja" ]; then
+    if [ -z "$ndk_fp" ] || [ "$(cat "$mesabuild_dir/.ndk-fingerprint" 2>/dev/null)" != "$ndk_fp" ]; then
+        warn "build dir was built with a different NDK toolchain; recreating: $mesabuild_dir"
+        rm -rf "$mesabuild_dir"
+    fi
+fi
+
 # --- cross/native files (stashed in the workdir; copied into the source ----
 # tree only for configure/compile and removed again afterwards) ------------
 mkdir -p "$WORKDIR"
@@ -205,6 +217,9 @@ if [ "$need_reconfigure" = "1" ]; then
             || { tail -n 40 "$WORKDIR/meson_log"; die "meson setup failed (log: $WORKDIR/meson_log)"; }
     fi
 fi
+
+# Record the toolchain this build dir was configured with.
+printf '%s\n' "$ndk_fp" > "$mesabuild_dir/.ndk-fingerprint"
 
 # --- compile --------------------------------------------------------------
 ninja_args=(-C "$mesabuild_dir")
