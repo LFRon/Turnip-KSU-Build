@@ -53,9 +53,9 @@ Everything needed from the network lives under `turnip_workdir/` in
 **version-agnostic slots** and is reused if present and verified:
 
 * `Android-NDK.zip` (archive) → `Android-NDK/` (extracted tree): verified
-  against a pinned `NDK_SHA256` when set, otherwise the upstream `.sha1`
-  sidecar (falling back to an archive integrity test if the sidecar is
-  unreachable) plus a `unzip -t` test; the tree is re-unpacked only when the
+  against the pinned `NDK_SHA256` from `config.sh` (the upstream `.sha1`
+  sidecar is 404 for r30; with an empty pin the sidecar/zip-test fallback
+  applies), plus a `unzip -t` test; the tree is re-unpacked only when the
   archive hash changes (`.unpacked` stamp).  Bumping `NDKVER` simply
   re-verifies and refreshes these slots in place; the mesa build dir is
   additionally recreated when the NDK toolchain version changes, because

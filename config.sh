@@ -25,17 +25,20 @@ MESA_DIR="${MESA_DIR:-$WORKDIR/mesa-source}"
 
 # --- Android NDK ----------------------------------------------------------
 # Unified, version-agnostic cache slots: bumping NDKVER re-verifies the
-# existing archive and re-unpacks in place only when the content changed.
-ndkver="${NDKVER:-android-ndk-r29}"
+# existing archive and re-unpacks in place only when the content changed;
+# the mesa build dir is additionally recreated when the toolchain changes.
+ndkver="${NDKVER:-android-ndk-r30}"
 ndkurl="${NDKURL:-https://dl.google.com/android/repository/${ndkver}-linux.zip}"
 ndkzip="$WORKDIR/archives/Android-NDK.zip"
 # NDK_DIR may point at an already extracted NDK root (then nothing is
 # downloaded); NDK_BIN defaults to the toolchain bin directory inside it.
 ndkdir="${NDK_DIR:-$WORKDIR/Android-NDK}"
 ndkbin="${NDK_BIN:-$ndkdir/toolchains/llvm/prebuilt/linux-x86_64/bin}"
-# Optional pinned checksum; when empty, the Google .sha1 sidecar plus a zip
-# integrity test are used instead.
-NDK_SHA256="${NDK_SHA256:-}"
+# Pinned archive checksum (sha256): verified after every download and on
+# every extraction; keep in sync with NDKVER.  Google's .sha1 sidecar is 404
+# for r30, so this pin is the primary integrity source (empty = sidecar plus
+# archive integrity test).
+NDK_SHA256="${NDK_SHA256:-753611f410d002cfcd3f3dc2ef49aad532089d3180b436c060a90bf0fcb64df2}"
 
 # --- target / toolchain ---------------------------------------------------
 sdkver="${SDKVER:-35}"   # load-bearing: stable-C gralloc backend + EFR gating

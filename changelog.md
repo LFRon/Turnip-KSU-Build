@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- NDK bumped to `android-ndk-r30` (archive SHA256 pinned in `config.sh`;
+  Google's `.sha1` sidecar is 404 for r30), and the mesa build dir is now
+  fingerprinted with the toolchain version (`.ndk-fingerprint`), recreated
+  when it changes, so a version bump cannot silently reuse object files
+  built by the previous clang.
 - `module/`: replaced the KernelSU self-mount design with the canonical
   layout.  The payload is the standard `system/vendor` tree, mounts and
   injection are left to the installed metamodule (or Magisk), and
