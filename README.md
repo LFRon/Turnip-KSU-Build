@@ -103,11 +103,15 @@ channel moves.
 
 ## Payload notes
 
-`module/` is shipped verbatim.  It is KernelSU-first: `post-fs-data.sh`
-manages the `skip_mount` marker, stages the HAL on tmpfs and binds it into
-the vendor HAL path (with a background top-up for covering overlayfs
-mounts); `customize.sh` fixes the SELinux labels and the marker at install
-time; `uninstall.sh` cleans up.  Magisk and APatch fall back to their native
-mount path automatically.  The four HAL paths cover both the `system/vendor`
-tree (Magisk `system/` overlay) and the promoted top-level `vendor/` tree
-(metamodule layouts).
+`module/` is shipped verbatim and follows the KernelSU metamodule contract:
+
+- The payload is the canonical `system/vendor/...` tree; providing it to the
+  device is the installed manager's job (a KernelSU metamodule mounts or
+  injects it, Magisk magic-mounts it).  The module performs no mounts and
+  sets no `skip_mount` marker, so every manager handles it through its
+  standard path.
+- `customize.sh` fixes the SELinux labels at install time (the HAL must stay
+  `same_process_hal_file`) and removes a stale `skip_mount` marker left over
+  from the old self-mount package.
+- `action.sh` reports whether the live HAL matches the payload and how it is
+  supplied (mount vs no-mount injection).
