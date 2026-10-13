@@ -1,0 +1,4 @@
+# Download/cache slots and staging (Android-NDK/, mesa-source/, archives/,
+# pack-*/, logs) plus build artifacts are never committed.
+/turnip_workdir/
+/out/
