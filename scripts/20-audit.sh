@@ -10,6 +10,8 @@ source "$HERE/lib.sh"
 
 hal="${HAL:-$hal_artifact}"
 [ -f "$hal" ] || die "HAL not found: $hal (build mesa first or pass --hal)"
+need_cmd strings
+need_cmd readelf
 
 log "strings audit (private gralloc references)"
 # Allowed by design: NDK libraries, the AIMapper stable-C interface and the

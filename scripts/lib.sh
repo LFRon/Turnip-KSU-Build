@@ -27,9 +27,11 @@ verify_file() {
     if [ -n "$sha256" ]; then
         printf '%s  %s\n' "$sha256" "$f" | sha256sum -c - >/dev/null 2>&1 || return 1
     elif [ -n "$sha1url" ]; then
-        want="$(curl -fsL "$sha1url" | tr -d '[:space:]')" || return 1
-        [ -n "$want" ] || return 1
-        printf '%s  %s\n' "$want" "$f" | sha1sum -c - >/dev/null 2>&1 || return 1
+        if want="$(curl -fsL "$sha1url" | tr -d '[:space:]')" && [ -n "$want" ]; then
+            printf '%s  %s\n' "$want" "$f" | sha1sum -c - >/dev/null 2>&1 || return 1
+        else
+            warn "checksum sidecar unavailable ($sha1url); falling back to an archive integrity test"
+        fi
     fi
     case "$f" in
         *.zip) unzip -tq "$f" >/dev/null 2>&1 || return 1 ;;
@@ -73,9 +75,15 @@ extract_zip_cached() {
     rm -rf "$dest" "$dest.tmp"
     unzip -q "$zip" -d "$dest.tmp" || die "unzip failed: $zip"
     top="$(find "$dest.tmp" -mindepth 1 -maxdepth 1 | head -n 1)"
-    [ -n "$top" ] || die "archive has no top-level directory: $zip"
-    mv "$top" "$dest"
-    rm -rf "$dest.tmp"
+    [ -n "$top" ] || die "extraction produced no entries: $zip"
+    if [ -d "$top" ] && [ "$(find "$dest.tmp" -mindepth 1 -maxdepth 1 | wc -l)" -eq 1 ]; then
+        mv "$top" "$dest"
+        rm -rf "$dest.tmp"
+    else
+        # Multi-root archives are kept as-is; inner sentinel paths may not
+        # resolve, in which case they simply re-extract on every run.
+        mv "$dest.tmp" "$dest"
+    fi
     printf '%s\n' "$stamp" > "$dest/.unpacked"
     info "extracted: $dest"
 }

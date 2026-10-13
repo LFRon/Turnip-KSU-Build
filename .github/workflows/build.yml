@@ -20,7 +20,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y meson ninja-build ccache patchelf zip unzip \
-              git python3-pip flex bison glslang-tools
+              git python3-pip binutils flex bison glslang-tools
           pip install mako
 
       - name: Cache workdir (NDK, mesa, staging)

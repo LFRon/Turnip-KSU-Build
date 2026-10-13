@@ -16,9 +16,11 @@ The layout is deliberately small and modular:
 
 ## Requirements
 
-`meson ninja patchelf zip unzip curl git ccache flex bison glslang
-glslangValidator` on PATH, plus the Python `mako` module (`./build.sh deps`
-checks and installs it).
+`meson ninja patchelf zip unzip curl git` are required on PATH
+(`./build.sh deps` verifies them); `ccache flex bison glslang
+glslangValidator pip` are recommended and only reported as warnings (meson
+drops a missing ccache wrapper on its own).  The Python `mako` module is
+installed automatically when missing.
 
 ## Quick start
 
@@ -39,7 +41,7 @@ Artifacts land in `out/`.  `build.sh` never downloads anything twice: see
 |------|--------|
 | `--mesa-dir <dir>` | build an existing mesa tree; it is used untouched and **never fetched** |
 | `--mesa-rev <rev>` | pin the mesa checkout to a revision (reproducible builds) |
-| `--update-mesa` | fast-forward the cached checkout before building |
+| `--update-mesa` | refresh the cached checkout (clean tree required; full trees fast-forward, shallow trees are force-updated to the branch tip) |
 | `--force-fetch` | re-download cached archives (NDK etc.) |
 | `--hal <file>` | use a prebuilt `libvulkan_freedreno.so` (skips the mesa phase) |
 | `--out <dir>` / `--workdir <dir>` | override output / cache directories |
@@ -52,12 +54,13 @@ Everything needed from the network lives under `turnip_workdir/` in
 
 * `Android-NDK.zip` (archive) → `Android-NDK/` (extracted tree): verified
   against a pinned `NDK_SHA256` when set, otherwise the upstream `.sha1`
-  sidecar plus a `unzip -t` integrity test; the tree is re-unpacked only when
-  the archive hash changes (`.unpacked` stamp).  Bumping `NDKVER` simply
+  sidecar (falling back to an archive integrity test if the sidecar is
+  unreachable) plus a `unzip -t` test; the tree is re-unpacked only when the
+  archive hash changes (`.unpacked` stamp).  Bumping `NDKVER` simply
   re-verifies and refreshes these slots in place.
 * `mesa-source/`: the cached checkout, pulled with `git clone --depth=1`
   (shallow; set `MESA_CLONE_DEPTH=0` for a full clone); used as-is, only
-  touched by `--update-mesa` (clean tree required) or `--mesa-rev`.
+  touched by `--update-mesa` or `--mesa-rev`.
   Reusing an existing checkout instead of cloning works by linking it into
   the slot — `ln -s ../../mesa-main turnip_workdir/mesa-source` — and the
   same trick applies to the NDK slot (`Android-NDK/`).
@@ -71,6 +74,10 @@ compiled**; they are removed again afterwards so the mesa checkout stays
 clean.  The copies keep their stashed mtimes, so unchanged files do not make
 ninja re-run meson — steady-state builds go straight to ninja (sub-second
 no-op).
+
+`./build.sh clean` removes the staging directories and `out/`; `clean-all`
+additionally removes every cache slot under `turnip_workdir/` (symlinked
+source trees are never touched — only the links themselves are removed).
 
 ## Maintainer duties
 

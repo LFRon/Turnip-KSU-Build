@@ -3,8 +3,9 @@
 #
 # Caching rules:
 #   * an existing checkout under turnip_workdir is reused as-is (no fetch);
-#   * --update-mesa refreshes it (fast-forward only, clean tree required);
-#   * --mesa-rev pins it to a revision;
+#   * --update-mesa refreshes it (clean tree required; a shallow tree is
+#     force-updated to the branch tip, a full tree fast-forwards);
+#   * --mesa-rev pins it to a revision (shallow fetch first, full retry);
 #   * --mesa-dir uses an external tree untouched (never fetched);
 #   * the NDK archive/extract under turnip_workdir is verified and reused;
 #   * cross/native files are stashed in turnip_workdir and copied into the
@@ -24,27 +25,38 @@ if [ -n "$MESA_CLONE_DEPTH" ] && [ "$MESA_CLONE_DEPTH" != "0" ]; then
     depth_desc="depth $MESA_CLONE_DEPTH"
 fi
 
+is_shallow() {
+    [ "$(git -C "$MESA_DIR" rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]
+}
+
 if [ "$mesa_dir_external" = "1" ]; then
     info "external mesa tree (never fetched): $MESA_DIR"
 elif [ -d "$MESA_DIR" ]; then
     if [ -d "$MESA_DIR/.git" ]; then
         if [ -n "$MESA_REV" ]; then
             log "pinning mesa to $MESA_REV"
-            git -C "$MESA_DIR" fetch "${depth_args[@]}" origin "$MESA_REV" || die "git fetch failed"
+            if is_shallow; then
+                git -C "$MESA_DIR" fetch --depth=1 origin "$MESA_REV" \
+                    || { warn "shallow fetch of $MESA_REV failed; retrying a full fetch"; \
+                         git -C "$MESA_DIR" fetch origin "$MESA_REV" || die "git fetch failed"; }
+            else
+                git -C "$MESA_DIR" fetch origin "$MESA_REV" || die "git fetch failed"
+            fi
             git -C "$MESA_DIR" checkout --detach "$MESA_REV" || die "git checkout failed"
         elif [ "$update_mesa" = "1" ]; then
             if [ -n "$(git -C "$MESA_DIR" status --porcelain)" ]; then
                 warn "mesa tree is dirty; skipping --update-mesa"
             else
                 log "updating mesa ($mesabranch)"
-                if [ "$(git -C "$MESA_DIR" rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]; then
+                if is_shallow; then
                     git -C "$MESA_DIR" fetch --depth=1 origin "$mesabranch" || die "git fetch failed"
+                    git -C "$MESA_DIR" checkout -B "$mesabranch" FETCH_HEAD || die "git checkout failed"
                 else
-                    git -C "$MESA_DIR" fetch "${depth_args[@]}" origin "$mesabranch" || die "git fetch failed"
+                    git -C "$MESA_DIR" fetch origin "$mesabranch" || die "git fetch failed"
+                    git -C "$MESA_DIR" checkout "$mesabranch" || die "git checkout failed"
+                    git -C "$MESA_DIR" merge --ff-only "origin/$mesabranch" \
+                        || warn "not a fast-forward; keeping the current tree"
                 fi
-                git -C "$MESA_DIR" checkout "$mesabranch" || die "git checkout failed"
-                git -C "$MESA_DIR" merge --ff-only "origin/$mesabranch" \
-                    || warn "not a fast-forward; keeping the current tree"
             fi
         fi
         info "mesa cache hit: $MESA_DIR @ $(git -C "$MESA_DIR" rev-parse --short HEAD)"
@@ -59,7 +71,9 @@ else
         git clone "${depth_args[@]}" --branch "$mesabranch" "$mesasrc" "$MESA_DIR" \
             || die "git clone failed"
         git -C "$MESA_DIR" fetch "${depth_args[@]}" origin "$MESA_REV" \
-            || die "git fetch of $MESA_REV failed (retry with MESA_CLONE_DEPTH=0 for a full clone)"
+            || { warn "shallow fetch of $MESA_REV failed; retrying a full fetch"; \
+                 git -C "$MESA_DIR" fetch origin "$MESA_REV" \
+                 || die "git fetch of $MESA_REV failed (retry with MESA_CLONE_DEPTH=0 for a full clone)"; }
         git -C "$MESA_DIR" checkout --detach "$MESA_REV" || die "git checkout failed"
     else
         log "cloning $mesasrc ($mesabranch, $depth_desc)"
@@ -69,6 +83,7 @@ else
 fi
 
 [ -f "$MESA_DIR/meson.build" ] || die "not a mesa source tree: $MESA_DIR"
+[ -w "$MESA_DIR" ] || die "mesa source tree is not writable (cross files are copied in for the build): $MESA_DIR"
 
 # A build dir configured for a different source path cannot be reused (meson
 # stores absolute paths); recreate it in place so a moved checkout heals.
@@ -82,6 +97,9 @@ fi
 if [ -d "$ndkbin" ] && [ "$force_fetch" != "1" ]; then
     info "ndk cache hit: $ndkdir"
 else
+    if [ -L "$ndkdir" ]; then
+        warn "NDK slot is a symlink; a refresh replaces it with a freshly extracted directory"
+    fi
     fetch_cached "$ndkurl" "$ndkzip" "$NDK_SHA256" "${ndkurl}.sha1"
     extract_zip_cached "$ndkzip" "$ndkdir" "toolchains/llvm/prebuilt/linux-x86_64/bin/clang"
 fi

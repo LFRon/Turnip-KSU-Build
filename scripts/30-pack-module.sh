@@ -12,6 +12,7 @@ source "$HERE/lib.sh"
 
 hal_src="${HAL:-$hal_artifact}"
 [ -f "$hal_src" ] || die "HAL not found: $hal_src (build mesa first or pass --hal)"
+[ "$(LC_ALL=C head -c 4 "$hal_src")" = "$(printf '\177ELF')" ] || die "not an ELF shared object: $hal_src"
 need_cmd patchelf
 need_cmd zip
 need_cmd unzip
