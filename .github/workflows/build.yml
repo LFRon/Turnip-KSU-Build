@@ -1,0 +1,52 @@
+# Draft CI: build the module on demand and publish the artifacts.
+# The "Publish" step is commented out until the release channel is set up
+# (gh auth / repository permissions); updateJson in module.prop points at
+# the `github_run` release tag of this repository.
+name: build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y meson ninja-build ccache patchelf zip unzip \
+              git python3-pip flex bison glslang-tools
+          pip install mako
+
+      - name: Cache workdir (NDK, mesa, staging)
+        uses: actions/cache@v4
+        with:
+          path: turnip_workdir
+          key: turnip-workdir-${{ hashFiles('config.sh') }}
+
+      - name: Build
+        run: ./build.sh all
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: turnip-artifacts
+          path: |
+            out/turnip.zip
+            out/turnip_adrenotools.zip
+            out/update.json
+            out/SHA256SUMS
+            out/build-info.json
+
+      # - name: Publish to the github_run release channel
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   run: |
+      #     gh release view github_run >/dev/null 2>&1 || gh release create github_run
+      #     gh release upload github_run out/turnip.zip \
+      #         out/turnip_adrenotools.zip out/update.json changelog.md --clobber
