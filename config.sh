@@ -43,11 +43,12 @@ sdkver="${SDKVER:-35}"   # load-bearing: stable-C gralloc backend + EFR gating
 # --- module payload -------------------------------------------------------
 module_id="turnip"       # must match module/module.prop
 hal_name="vulkan.adreno.so"
+# Canonical module layout: the manager maps system/vendor onto /vendor
+# (KernelSU also auto-creates the top-level vendor symlink); never ship a
+# real top-level vendor/ tree yourself.
 hal_paths=(
     "system/vendor/lib64/hw"
     "system/vendor/lib/hw"
-    "vendor/lib64/hw"
-    "vendor/lib/hw"
 )
 adrenotools_name="vulkan.freedreno.so"
 
