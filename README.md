@@ -108,13 +108,39 @@ channel moves.
 
 `module/` is shipped verbatim and follows the KernelSU metamodule contract:
 
-- The payload is the canonical `system/vendor/...` tree; providing it to the
-  device is the installed manager's job (a KernelSU metamodule mounts or
-  injects it, Magisk magic-mounts it).  The module performs no mounts and
-  sets no `skip_mount` marker, so every manager handles it through its
-  standard path.
-- `customize.sh` fixes the SELinux labels at install time (the HAL must stay
-  `same_process_hal_file`) and removes a stale `skip_mount` marker left over
-  from the old self-mount package.
-- `action.sh` reports whether the live HAL matches the payload and how it is
-  supplied (mount vs no-mount injection).
+- The payload is the canonical `system/vendor/...` tree.  Every manager that
+  mounts module files provides it through its standard path (a KernelSU
+  metamodule mounts or injects it, Magisk magic-mounts it, KernelSU <= 2.x
+  overlays `/system` and `/vendor` natively).  `skip_mount` is never set -- a
+  stale marker from the removed v3 design is deleted at install time -- so no
+  manager is ever told to skip the module.
+- The single criterion that decides whether the boot scripts serve the HAL
+  themselves is the dedicated attribute `KernelSU_Module=true` in
+  `module.prop`.  `customize.sh` stamps it at install time (`true` only for a
+  KernelSU install), so Magisk and every other manager keep mounting the
+  canonical payload and never enter that path.
+- On KernelSU the module always serves the HAL itself:
+  * KernelSU >= 3 mounts no module files by itself (v3.3.1 `init_event.rs`
+    executes only a metamodule's `metamount.sh`), so without a metamodule
+    nothing else would supply the HAL at all;
+  * `post-fs-data.sh` binds the payload over the stock HAL before the
+    metamodule's mount stage (fixed KernelSU order: metamodule post-fs-data ->
+    module scripts -> system.prop -> metamount.sh -> post-mount), so the bind
+    sits below a metamodule mount.  The bind carries no `source=KSU` marker,
+    and KernelSU's per-app "unmount modules" feature only detaches mounts in
+    its own umount list (`metamodule.md` requires metamodules to mark their
+    mounts `KSU`; `kernel/feature/kernel_umount.c` walks that list), so Turnip
+    stays available even with "unmount modules by default" enabled;
+  * `post-mount.sh` re-checks after the manager's mount stage and binds on top
+    when the payload is still not live (no metamodule, a mount tree without
+    this payload, or a manager mount that shadowed the earlier bind);
+  * `turnip-provision.sh` is the shared helper (idempotent: nothing happens
+    when the live HAL already is the payload; the payload is relabelled to
+    `same_process_hal_file` first) and `uninstall.sh` detaches exactly those
+    binds again.
+  The bind source (`/data/adb/modules/<id>/...`) is visible in
+  `/proc/*/mountinfo`; that is the deliberate price of a supply that survives
+  KernelSU's per-app unmount policy.
+- `action.sh` reports the attribute, the metamodule, whether the live HAL
+  matches the payload, the mount type and how many module binds are attached,
+  and tails `provision.log`.

@@ -5,3 +5,4 @@ versionCode=2630
 author=MrMiy4mo
 description=Turnip is an open-source vulkan driver for devices with adreno GPUs.
 updateJson=https://github.com/LFRon/Turnip-KSU-Build/releases/download/github_run/update.json
+KernelSU_Module=false

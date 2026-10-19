@@ -26,6 +26,24 @@ grep -q "^id=$module_id$" "$stage/module.prop" || die "module.prop: id must be $
 grep -q '^version=' "$stage/module.prop" || die "module.prop: version is missing"
 grep -q '^versionCode=' "$stage/module.prop" || die "module.prop: versionCode is missing"
 
+# Regression guard: KernelSU >= 3 mounts no module files by itself, so the
+# payload must keep the scripts that serve the HAL itself, must carry the
+# dedicated KernelSU_Module attribute, and must never create skip_mount.
+# Losing any of this silently breaks the KernelSU supply model.
+for f in customize.sh action.sh post-fs-data.sh post-mount.sh uninstall.sh turnip-provision.sh system.prop; do
+    [ -f "$stage/$f" ] || die "module payload lost required file: $f"
+done
+grep -q '^KernelSU_Module=' "$stage/module.prop" || die "module.prop: KernelSU_Module attribute is missing"
+grep -q 'KernelSU_Module=' "$stage/customize.sh" || die "customize.sh no longer stamps the attribute"
+grep -q 'KernelSU_Module=true' "$stage/post-fs-data.sh" || die "post-fs-data.sh lost the attribute criterion"
+grep -q 'KernelSU_Module=true' "$stage/post-mount.sh" || die "post-mount.sh lost the attribute criterion"
+grep -q 'turnip-provision.sh' "$stage/post-fs-data.sh" || die "post-fs-data.sh no longer provisions"
+grep -q 'turnip-provision.sh' "$stage/post-mount.sh" || die "post-mount.sh no longer provisions"
+grep -q 'rm -f "\$MODPATH/skip_mount"' "$stage/customize.sh" || die "customize.sh no longer clears skip_mount"
+if grep -qE '(: *> *"\$MODPATH/skip_mount"|touch .*skip_mount)' "$stage/customize.sh"; then
+    die "customize.sh must not create skip_mount"
+fi
+
 log "patching soname to $hal_name"
 hal_tmp="$stage/.hal.soname.tmp"
 cp "$hal_src" "$hal_tmp"

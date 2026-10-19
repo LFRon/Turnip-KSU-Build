@@ -14,10 +14,21 @@ set_perm $MODPATH/system/vendor/lib 0 0 0755 u:object_r:vendor_file:s0
 set_perm $MODPATH/system/vendor/lib/hw 0 0 0755 u:object_r:vendor_hal_file:s0
 set_perm $MODPATH/system/vendor/lib/hw/vulkan.adreno.so 0 0 0644 u:object_r:same_process_hal_file:s0
 
-# The earlier self-mount package set the standard skip_mount marker to keep
-# metamodules away from this module.  That design is gone: every manager is
-# now expected to provide the payload through its standard path, and a stale
-# marker would silently make all of them skip it.  A KernelSU update replaces
-# the module directory anyway; this covers manual extraction and other
-# managers.
+# Stamp the dedicated attribute that the boot scripts use as their single
+# criterion for serving the HAL themselves (post-fs-data.sh / post-mount.sh):
+# only a KernelSU install gets `true`, so Magisk and every other manager keep
+# mounting the canonical payload natively and never enter that path.
+if [ "$KSU" = "true" ]; then
+    _turnip_attr=true
+else
+    _turnip_attr=false
+fi
+if grep -q '^KernelSU_Module=' "$MODPATH/module.prop" 2>/dev/null; then
+    sed -i "s/^KernelSU_Module=.*/KernelSU_Module=$_turnip_attr/" "$MODPATH/module.prop"
+else
+    echo "KernelSU_Module=$_turnip_attr" >>"$MODPATH/module.prop"
+fi
+
+# skip_mount is never used: every manager keeps seeing the canonical payload.
+# Remove a stale marker left over from the removed v3 self-mount package.
 rm -f "$MODPATH/skip_mount"
